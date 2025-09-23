@@ -19,7 +19,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { spawn } from "child_process";
-app.use(cors({ origin: "*" }../));
+app.use(cors({ origin: "*" }));
 app.use(express.json({ limit: "30mb", extended: true }));
 app.use(express.urlencoded({ limit: "30mb", extended: true }));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
