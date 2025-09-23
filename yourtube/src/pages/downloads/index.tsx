@@ -29,7 +29,7 @@ const Downloads = () => {
               <span className="font-medium">{video.videotitle}</span>
               <Button
                 onClick={() => {
-                  window.open(`${process.env.BACKEND_URL || "http://localhost:5000"}/uploads/${video.filename}`);
+                  window.open(`${process.env.BACKEND_URL || "https://nullclass-assignment-1serser.onrender.com"}/uploads/${video.filename}`);
                 }}
                 variant="outline"
               >

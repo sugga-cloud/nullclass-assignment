@@ -98,7 +98,7 @@ export default function VideoPlayer({ video }: VideoPlayerProps) {
   const srcUrl = useMemo(() => {
     const raw = video?.filepath || "";
     if (!raw) return "";
-    const backend = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "http://localhost:5000";
+    const backend = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "https://nullclass-assignment-1serser.onrender.com/";
   // replace backslashes with forward slashes (Windows paths) and strip leading slashes
   const cleaned = raw.replace(/\\/g, "/").replace(/^\/+/, "");
     const encoded = cleaned.split("/").map((seg) => encodeURIComponent(seg)).join("/");

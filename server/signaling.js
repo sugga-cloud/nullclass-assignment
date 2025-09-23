@@ -32,7 +32,7 @@ io.on("connection", (socket) => {
   });
 });
 
-const PORT = process.env.SIGNAL_PORT || 5001;
+const PORT = process.env.SIGNAL_PORT || 10000;
 httpServer.listen(PORT, () => {
   console.log(`[signaling] Server running on port ${PORT}`);
 });

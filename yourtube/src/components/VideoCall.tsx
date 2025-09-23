@@ -1,7 +1,7 @@
 import io from "socket.io-client";
 import { useRef, useState, useEffect } from "react";
 
-const SIGNAL_URL = process.env.NEXT_PUBLIC_SIGNAL_URL || "http://localhost:5001";
+const SIGNAL_URL = process.env.NEXT_PUBLIC_SIGNAL_URL || "https://nullclass-assignment-1serser.onrender.com";
 
 const VideoCall: React.FC = () => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
