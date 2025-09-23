@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Razorpay UI Demo</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+  <button id="payBtn">Open Razorpay UI</button>
+
+  <script>
+    document.getElementById('payBtn').onclick = function () {
+      var options = {
+        key: "rzp_test_1234567890abcd", // use any dummy test key format
+        amount: 50000,                  // 500 INR (in paise)
+        currency: "INR",
+        name: "Demo Store",
+        description: "UI Flow Only (No Payment)",
+        handler: function (response) {
+          alert("UI Flow Completed!\n\nPayment ID (fake): " + response.razorpay_payment_id);
+        },
+        prefill: {
+          name: "Test User",
+          email: "test@example.com",
+          contact: "9876543210"
+        },
+        theme: {
+          color: "#3399cc"
+        }
+      };
+      var rzp1 = new Razorpay(options);
+      rzp1.open();
+    };
+  </script>
+</body>
+</html>
+ 
