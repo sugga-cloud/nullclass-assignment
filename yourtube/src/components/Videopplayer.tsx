@@ -102,7 +102,7 @@ export default function VideoPlayer({ video }: VideoPlayerProps) {
   // replace backslashes with forward slashes (Windows paths) and strip leading slashes
   const cleaned = raw.replace(/\\/g, "/").replace(/^\/+/, "");
     const encoded = cleaned.split("/").map((seg) => encodeURIComponent(seg)).join("/");
-    return `${backend}/${encoded}`;
+    return `${video?.filepath}`;
   }, [video?.filepath]);
 
   const [videoError, setVideoError] = useState<string | null>(null);
