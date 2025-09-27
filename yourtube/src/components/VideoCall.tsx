@@ -1,7 +1,9 @@
 import io from "socket.io-client";
 import { useRef, useState, useEffect } from "react";
 
-const SIGNAL_URL = process.env.NEXT_PUBLIC_SIGNAL_URL || "https://nullclass-assignment-1serser.onrender.com";
+const SIGNAL_URL =
+  process.env.NEXT_PUBLIC_SIGNAL_URL ||
+  "https://nullclass-assignment-1serser.onrender.com";
 
 const VideoCall: React.FC = () => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -13,6 +15,11 @@ const VideoCall: React.FC = () => {
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const socketRef = useRef<any>(null);
+
+  // --- Recorder ---
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const [recording, setRecording] = useState(false);
 
   // --- SOCKET ---
   useEffect(() => {
@@ -30,13 +37,10 @@ const VideoCall: React.FC = () => {
 
     socket.on("signal", async (data: any) => {
       if (data.type === "offer") {
-        console.log("Received offer:", data);
         await handleOffer(data);
       } else if (data.type === "answer") {
-        console.log("Received answer:", data);
         await handleAnswer(data);
       } else if (data.candidate) {
-        console.log("Received ICE candidate:", data);
         await handleCandidate(data);
       }
     });
@@ -55,13 +59,11 @@ const VideoCall: React.FC = () => {
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
-        console.log("Sending ICE candidate:", e.candidate);
         socketRef.current.emit("signal", { room, data: e.candidate });
       }
     };
 
     pc.ontrack = (e) => {
-      console.log("Track received:", e.streams[0].getTracks());
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = e.streams[0];
       }
@@ -83,7 +85,6 @@ const VideoCall: React.FC = () => {
         audio: true,
       });
 
-      // Combine display and mic audio
       const combinedStream = new MediaStream([
         ...displayStream.getVideoTracks(),
         ...audioStream.getAudioTracks(),
@@ -93,10 +94,8 @@ const VideoCall: React.FC = () => {
         localVideoRef.current.srcObject = combinedStream;
       }
 
-      console.log("Local stream created:", combinedStream.getTracks());
       return combinedStream;
     } catch (err) {
-      console.error("Screen share or mic not available:", err);
       setStatus("Error: Screen share or mic not available.");
       return new MediaStream();
     }
@@ -112,7 +111,6 @@ const VideoCall: React.FC = () => {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       socketRef.current.emit("signal", { room, data: offer });
-      console.log("Offer created and sent:", offer);
     } catch (err) {
       console.error("createOffer error:", err);
     }
@@ -124,21 +122,17 @@ const VideoCall: React.FC = () => {
     stream.getTracks().forEach((t) => pc.addTrack(t, stream));
 
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    console.log("Remote description set from offer.");
 
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     socketRef.current.emit("signal", { room, data: answer });
-    console.log("Answer created and sent:", answer);
 
-    // Flush queued ICE candidates after remote description is set
     await flushCandidates();
   };
 
   const handleAnswer = async (answer: RTCSessionDescriptionInit) => {
     if (!pcRef.current) return;
     await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
-    console.log("Remote description set from answer.");
     await flushCandidates();
   };
 
@@ -146,36 +140,32 @@ const VideoCall: React.FC = () => {
 
   const handleCandidate = async (candidate: RTCIceCandidateInit) => {
     if (!pcRef.current) {
-      console.log("PC not ready, queuing candidate:", candidate);
       pendingCandidatesRef.current.push(candidate);
       return;
     }
 
-    // If remote description is not set yet, queue the candidate
-    if (!pcRef.current.remoteDescription || !pcRef.current.remoteDescription.type) {
-      console.log("Remote description not set, queuing candidate:", candidate);
+    if (
+      !pcRef.current.remoteDescription ||
+      !pcRef.current.remoteDescription.type
+    ) {
       pendingCandidatesRef.current.push(candidate);
       return;
     }
 
     try {
       await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-      console.log("ICE candidate added successfully:", candidate);
     } catch (err) {
       console.error("ICE error:", err);
     }
   };
 
-  // After setting remote description, flush queued candidates
   const flushCandidates = async () => {
     if (!pcRef.current) return;
     const candidates = pendingCandidatesRef.current;
     pendingCandidatesRef.current = [];
-    console.log(`Flushing ${candidates.length} queued ICE candidates.`);
     for (const c of candidates) {
       try {
         await pcRef.current.addIceCandidate(new RTCIceCandidate(c));
-        console.log("Flushed ICE candidate:", c);
       } catch (err) {
         console.error("ICE flush error:", err);
       }
@@ -186,6 +176,66 @@ const VideoCall: React.FC = () => {
     if (!room) return;
     setJoined(true);
     setStatus("Joining room...");
+  };
+
+  // --- RECORDING ---
+  const startRecording = () => {
+    if (!localVideoRef.current || !remoteVideoRef.current) {
+      setStatus("Video not ready for recording");
+      return;
+    }
+
+    // Merge local + remote streams into one
+    const combinedStream = new MediaStream();
+
+    const localTracks = (localVideoRef.current.srcObject as MediaStream)
+      ?.getTracks();
+    const remoteTracks = (remoteVideoRef.current.srcObject as MediaStream)
+      ?.getTracks();
+
+    localTracks?.forEach((t) => combinedStream.addTrack(t));
+    remoteTracks?.forEach((t) => combinedStream.addTrack(t));
+
+    try {
+      const recorder = new MediaRecorder(combinedStream, {
+        mimeType: "video/webm;codecs=vp9,opus",
+      });
+      recorderRef.current = recorder;
+      recordedChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          recordedChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, {
+          type: "video/webm",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `video-call-${Date.now()}.webm`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      recorder.start();
+      setRecording(true);
+      setStatus("Recording started...");
+    } catch (err) {
+      console.error("Recorder error:", err);
+      setStatus("Recording not supported.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.stop();
+      setRecording(false);
+      setStatus("Recording stopped. Downloading file...");
+    }
   };
 
   // --- UI ---
@@ -200,14 +250,47 @@ const VideoCall: React.FC = () => {
         onChange={(e) => setRoom(e.target.value)}
         className="border p-1 rounded mr-2"
       />
-      <button onClick={handleJoin} className="btn">Join Room</button>
+      <button onClick={handleJoin} className="btn">
+        Join Room
+      </button>
 
       <div className="text-sm text-gray-600 my-2">{status}</div>
 
       <div className="flex gap-4">
-        <video ref={localVideoRef} autoPlay playsInline muted className="w-1/2 border bg-black" />
-        <video ref={remoteVideoRef} autoPlay playsInline className="w-1/2 border bg-black" />
+        <video
+          ref={localVideoRef}
+          autoPlay
+          playsInline
+          muted
+          className="w-1/2 border bg-black"
+        />
+        <video
+          ref={remoteVideoRef}
+          autoPlay
+          playsInline
+          className="w-1/2 border bg-black"
+        />
       </div>
+
+      {joined && (
+        <div className="mt-4">
+          {!recording ? (
+            <button
+              onClick={startRecording}
+              className="bg-green-500 text-white px-3 py-1 rounded"
+            >
+              Start Recording
+            </button>
+          ) : (
+            <button
+              onClick={stopRecording}
+              className="bg-red-500 text-white px-3 py-1 rounded"
+            >
+              Stop Recording
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };
